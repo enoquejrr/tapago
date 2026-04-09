@@ -1,4 +1,4 @@
-# Rastreador da Grana
+# Tá Pago?
 
 App pessoal para organizar pagamentos mensais com login por usuário.
 
@@ -26,7 +26,7 @@ App pessoal para organizar pagamentos mensais com login por usuário.
 3. Crie o arquivo `.streamlit/secrets.toml` com suas credenciais (veja abaixo)
 4. Rode o app:
    ```bash
-   streamlit run app.py
+   streamlit run Painel.py
    ```
 
 ## Configuração de secrets
