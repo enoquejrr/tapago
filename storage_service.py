@@ -17,8 +17,9 @@ from supabase import create_client, Client
 class StorageService:
     """Gerencia leitura, escrita e atualização de boletos no Supabase."""
 
-    def __init__(self):
+    def __init__(self, usuario: str = None):
         self.client: Client = create_client(_url, _key)
+        self.usuario = usuario
 
     def _row(self, r: dict) -> Dict[str, Any]:
         """Normaliza resposta do Supabase para o formato esperado pelo app."""
@@ -33,9 +34,13 @@ class StorageService:
             "criado_em": r.get("criado_em", ""),
         }
 
+    def _query(self):
+        """Query base já filtrada pelo usuário logado."""
+        return self.client.table("boletos").select("*").eq("usuario", self.usuario)
+
     def load_all(self) -> List[Dict[str, Any]]:
-        """Carrega todos os boletos."""
-        res = self.client.table("boletos").select("*").order("vencimento").execute()
+        """Carrega todos os boletos do usuário."""
+        res = self._query().order("vencimento").execute()
         return [self._row(r) for r in res.data]
 
     def save_all(self, boletos: List[Dict[str, Any]]) -> None:
@@ -43,7 +48,7 @@ class StorageService:
         pass
 
     def create(self, descricao: str, valor: float, vencimento: str, competencia: str, categoria: str = None) -> Dict[str, Any]:
-        """Cria novo boleto."""
+        """Cria novo boleto para o usuário logado."""
         row = {
             "descricao": descricao,
             "valor": valor,
@@ -51,6 +56,7 @@ class StorageService:
             "competencia": competencia,
             "categoria": categoria,
             "pago": False,
+            "usuario": self.usuario,
         }
         res = self.client.table("boletos").insert(row).execute()
         return self._row(res.data[0])
@@ -70,10 +76,9 @@ class StorageService:
         return criados
 
     def get_by_month(self, competencia: str) -> List[Dict[str, Any]]:
-        """Retorna boletos de um mês específico."""
+        """Retorna boletos de um mês específico do usuário."""
         res = (
-            self.client.table("boletos")
-            .select("*")
+            self._query()
             .eq("competencia", competencia)
             .order("vencimento")
             .execute()
@@ -82,11 +87,11 @@ class StorageService:
 
     def update_status(self, boleto_id: str, pago: bool) -> None:
         """Marca boleto como pago/não pago."""
-        self.client.table("boletos").update({"pago": pago}).eq("id", int(boleto_id)).execute()
+        self.client.table("boletos").update({"pago": pago}).eq("id", int(boleto_id)).eq("usuario", self.usuario).execute()
 
     def delete(self, boleto_id: str) -> None:
         """Remove um boleto."""
-        self.client.table("boletos").delete().eq("id", int(boleto_id)).execute()
+        self.client.table("boletos").delete().eq("id", int(boleto_id)).eq("usuario", self.usuario).execute()
 
     def get_total_month(self, competencia: str) -> float:
         """Calcula total de boletos de um mês."""
@@ -99,10 +104,11 @@ class StorageService:
         return sum(b["valor"] for b in boletos if b["pago"])
 
     def get_totals_by_category(self, year: str) -> Dict[str, float]:
-        """Retorna soma de valores por categoria para um ano."""
+        """Retorna soma de valores por categoria para um ano do usuário."""
         res = (
             self.client.table("boletos")
             .select("categoria, valor")
+            .eq("usuario", self.usuario)
             .like("competencia", f"{year}-%")
             .execute()
         )

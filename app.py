@@ -1,6 +1,7 @@
 """Aplicação Streamlit para rastreamento de boletos/contas mensais."""
 import streamlit as st
 import pandas as pd
+import streamlit_authenticator as stauth
 from datetime import datetime, timedelta
 from storage_service import StorageService
 from utils import (
@@ -27,8 +28,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ============= LOGIN =============
+authenticator = stauth.Authenticate(
+    st.secrets["credentials"].to_dict(),
+    st.secrets["cookie"]["name"],
+    st.secrets["cookie"]["key"],
+    st.secrets["cookie"]["expiry_days"],
+)
+
+authenticator.login()
+
+if not st.session_state.get("authentication_status"):
+    st.stop()
+
+username = st.session_state["username"]
+authenticator.logout("Sair", "sidebar")
+
 # Inicialização
-storage = StorageService()
+storage = StorageService(usuario=username)
 if "current_month" not in st.session_state:
     st.session_state.current_month = get_current_month()
 if "refresh" not in st.session_state:
