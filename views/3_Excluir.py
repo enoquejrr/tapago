@@ -16,7 +16,7 @@ st.markdown("""
 
 username = check_auth()
 sidebar_logout()
-storage = StorageService(usuario=username)
+storage = StorageService(usuario=username, access_token=st.session_state.get("access_token"))
 
 # Inicializa estados de controle
 if "ids_para_excluir" not in st.session_state:

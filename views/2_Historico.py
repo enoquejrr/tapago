@@ -14,7 +14,7 @@ st.markdown("""
 
 username = check_auth()
 sidebar_logout()
-storage = StorageService(usuario=username)
+storage = StorageService(usuario=username, access_token=st.session_state.get("access_token"))
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
 st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>📊 Histórico</h2>", unsafe_allow_html=True)

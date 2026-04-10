@@ -27,9 +27,12 @@ def _get_supabase_client() -> Client:
 class StorageService:
     """Gerencia leitura, escrita e atualização de boletos no Supabase."""
 
-    def __init__(self, usuario: str = None):
+    def __init__(self, usuario: str = None, access_token: str = None):
         self.client: Client = _get_supabase_client()
         self.usuario = usuario
+        # Injeta o JWT do usuário logado para que auth.uid() funcione no RLS
+        if access_token:
+            self.client.postgrest.auth(access_token)
 
     def _row(self, r: dict) -> Boleto:
         """Normaliza resposta do Supabase para o formato esperado pelo app."""

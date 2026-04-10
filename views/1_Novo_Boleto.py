@@ -14,7 +14,7 @@ st.markdown("""
 
 username = check_auth()
 sidebar_logout()
-storage = StorageService(usuario=username)
+storage = StorageService(usuario=username, access_token=st.session_state.get("access_token"))
 boleto_svc = BoletoService(storage)
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────

@@ -31,7 +31,7 @@ st.markdown("""
 
 username = check_auth()
 sidebar_logout()
-storage = StorageService(usuario=username)
+storage = StorageService(usuario=username, access_token=st.session_state.get("access_token"))
 
 if "current_month" not in st.session_state:
     st.session_state.current_month = get_current_month()
