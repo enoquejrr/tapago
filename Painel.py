@@ -76,6 +76,15 @@ except RuntimeError as e:
     st.error(str(e))
     st.stop()
 
+# ── Filtro por categoria — aplicado ANTES dos cards para totais corretos ────
+if boletos:
+    categorias_mes = sorted({b["categoria"] for b in boletos if b.get("categoria")})
+    if categorias_mes:
+        cat_opcoes = ["Todas"] + categorias_mes
+        cat_filtro = st.selectbox("Filtrar por categoria:", cat_opcoes, key="painel_cat_filtro")
+        if cat_filtro != "Todas":
+            boletos = [b for b in boletos if b.get("categoria") == cat_filtro]
+
 total_mes = sum(b["valor"] for b in boletos)
 total_pago = sum(b["valor"] for b in boletos if b["pago"])
 total_pendente = total_mes - total_pago
@@ -98,14 +107,6 @@ st.divider()
 if not boletos:
     st.info("Nenhum pagamento cadastrado para este mês. Use **Novo Pagamento** na barra lateral para adicionar.")
 else:
-    # ── Filtro por categoria ─────────────────────────────────────────────────
-    categorias_mes = sorted({b["categoria"] for b in boletos if b.get("categoria")})
-    if categorias_mes:
-        cat_opcoes = ["Todas"] + categorias_mes
-        cat_filtro = st.selectbox("Filtrar por categoria:", cat_opcoes, key="painel_cat_filtro")
-        if cat_filtro != "Todas":
-            boletos = [b for b in boletos if b.get("categoria") == cat_filtro]
-
     vencidos = [b for b in boletos if not b["pago"] and is_overdue(b["vencimento"])]
     proximos = [b for b in boletos if not b["pago"] and is_due_soon(b["vencimento"])]
     normais  = [b for b in boletos if not b["pago"] and not is_overdue(b["vencimento"]) and not is_due_soon(b["vencimento"])]

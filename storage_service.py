@@ -1,10 +1,8 @@
 """Serviço de persistência de dados via Supabase."""
-import calendar
 import logging
 import os
 from typing import List, Dict, Any
 from models import Boleto
-from datetime import datetime
 
 import streamlit as st
 from supabase import create_client, Client
@@ -83,42 +81,6 @@ class StorageService:
             logger.error("Erro ao buscar boletos do mês %s: %s", competencia, e, exc_info=True)
             raise RuntimeError("Não foi possível carregar os pagamentos do mês. Tente novamente.") from e
 
-    def get_total_month(self, competencia: str) -> float:
-        """Calcula total de boletos de um mês."""
-        boletos = self.get_by_month(competencia)
-        return sum(b["valor"] for b in boletos)
-
-    def get_total_paid_month(self, competencia: str) -> float:
-        """Calcula total de boletos pagos de um mês."""
-        boletos = self.get_by_month(competencia)
-        return sum(b["valor"] for b in boletos if b["pago"])
-
-    def get_month_totals(self, competencia: str) -> Dict[str, float]:
-        """Retorna total e total pago de um mês em uma única query."""
-        boletos = self.get_by_month(competencia)
-        total = sum(b["valor"] for b in boletos)
-        pago = sum(b["valor"] for b in boletos if b["pago"])
-        return {"total": total, "pago": pago, "pendente": total - pago}
-
-    def get_totals_by_category(self, year: str) -> Dict[str, float]:
-        """Retorna soma de valores por categoria para um ano do usuário."""
-        try:
-            res = (
-                self.client.table("boletos")
-                .select("categoria, valor")
-                .eq("usuario", self.usuario)
-                .like("competencia", f"{year}-%")
-                .execute()
-            )
-            totais: Dict[str, float] = {}
-            for r in res.data:
-                cat = r.get("categoria") or "Sem categoria"
-                totais[cat] = totais.get(cat, 0) + float(r["valor"])
-            return totais
-        except Exception as e:
-            logger.error("Erro ao buscar totais por categoria (%s): %s", year, e, exc_info=True)
-            raise RuntimeError("Não foi possível carregar o resumo anual. Tente novamente.") from e
-
     def check_duplicate(self, descricao: str, vencimento: str) -> bool:
         """Verifica se já existe pagamento com mesmo nome e data de vencimento."""
         try:
@@ -171,21 +133,6 @@ class StorageService:
         except Exception as e:
             logger.error("Erro ao criar boleto: %s", e, exc_info=True)
             raise RuntimeError("Não foi possível salvar o pagamento. Tente novamente.") from e
-
-    def create_recurring(self, descricao: str, valor: float, vencimento: str, competencia: str, categoria: str = None, meses: int = 1) -> List[Boleto]:
-        """Cria N boletos mensais a partir da data base, respeitando meses com menos de 31 dias."""
-        criados = []
-        base_date = datetime.strptime(vencimento, "%Y-%m-%d")
-        for i in range(meses):
-            month = ((base_date.month - 1 + i) % 12) + 1
-            year = base_date.year + (base_date.month - 1 + i) // 12
-            max_day = calendar.monthrange(year, month)[1]
-            day = min(base_date.day, max_day)
-            nova_data = base_date.replace(year=year, month=month, day=day)
-            nova_vencimento = nova_data.strftime("%Y-%m-%d")
-            nova_competencia = nova_data.strftime("%Y-%m")
-            criados.append(self.create(descricao, valor, nova_vencimento, nova_competencia, categoria))
-        return criados
 
     def update_status(self, boleto_id: str, pago: bool) -> None:
         """Marca boleto como pago/não pago."""
