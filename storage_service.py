@@ -118,6 +118,16 @@ class StorageService:
             totais[cat] = totais.get(cat, 0) + float(r["valor"])
         return totais
 
+    def check_duplicate(self, descricao: str, vencimento: str) -> bool:
+        """Verifica se já existe pagamento com mesmo nome e data de vencimento."""
+        res = (
+            self._query()
+            .eq("descricao", descricao)
+            .eq("vencimento", vencimento)
+            .execute()
+        )
+        return len(res.data) > 0
+
     def get_categorias(self) -> List[str]:
         """Retorna lista de categorias salvas."""
         res = self.client.table("categorias").select("nome").order("nome").execute()

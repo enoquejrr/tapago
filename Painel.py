@@ -1,7 +1,7 @@
 """Dashboard — visão do mês atual."""
 import streamlit as st
 from datetime import datetime, timedelta
-from auth import check_auth
+from auth import check_auth, sidebar_logout
 from storage_service import StorageService
 from utils import (
     get_current_month,
@@ -32,6 +32,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 username = check_auth()
+sidebar_logout()
 storage = StorageService(usuario=username)
 
 if "current_month" not in st.session_state:

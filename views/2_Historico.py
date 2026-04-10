@@ -1,7 +1,7 @@
 """Página de histórico e resumo anual por categoria."""
 import streamlit as st
 import pandas as pd
-from auth import check_auth
+from auth import check_auth, sidebar_logout
 from storage_service import StorageService
 from utils import format_currency, format_date_br
 
@@ -13,14 +13,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 username = check_auth()
+sidebar_logout()
 storage = StorageService(usuario=username)
-
-if "delete_confirm" not in st.session_state:
-    st.session_state.delete_confirm = None
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
 st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>📊 Histórico</h2>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B; margin-top:0'>Consulte, filtre e exclua boletos registrados.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748B; margin-top:0'>Consulte e filtre pagamentos registrados.</p>", unsafe_allow_html=True)
 st.divider()
 
 todos_boletos = storage.load_all()
@@ -67,32 +65,6 @@ if boletos_filtrados:
         use_container_width=True,
         hide_index=True,
     )
-
-    # ── Exclusão com confirmação ─────────────────────────────────────────────
-    st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
-    del_id = st.selectbox(
-        "Excluir boleto:",
-        options=[b["id"] for b in boletos_filtrados],
-        format_func=lambda bid: next(b["descricao"] for b in boletos_filtrados if b["id"] == bid),
-        index=None,
-        placeholder="Selecione para excluir...",
-    )
-
-    if del_id:
-        if st.session_state.delete_confirm == del_id:
-            st.warning("Tem certeza? Esta ação não pode ser desfeita.")
-            c1, c2 = st.columns(2)
-            if c1.button("✓ Confirmar exclusão", type="primary", use_container_width=True):
-                storage.delete(del_id)
-                st.session_state.delete_confirm = None
-                st.rerun()
-            if c2.button("✗ Cancelar", use_container_width=True):
-                st.session_state.delete_confirm = None
-                st.rerun()
-        else:
-            if st.button("🗑️ Excluir selecionado"):
-                st.session_state.delete_confirm = del_id
-                st.rerun()
 
 # ── Resumo anual por categoria ───────────────────────────────────────────────
 st.divider()
