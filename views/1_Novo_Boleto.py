@@ -3,6 +3,7 @@ import streamlit as st
 from datetime import date
 from auth import check_auth, sidebar_logout
 from storage_service import StorageService
+from services.boleto_service import BoletoService
 
 st.markdown("""
 <style>
@@ -14,6 +15,7 @@ st.markdown("""
 username = check_auth()
 sidebar_logout()
 storage = StorageService(usuario=username)
+boleto_svc = BoletoService(storage)
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
 st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>➕ Novo Pagamento</h2>", unsafe_allow_html=True)
@@ -48,6 +50,7 @@ with col_cat_outer:
         nova_cat = st.text_input(
             "Nome da nova categoria",
             placeholder="Ex: Pets, Academia...",
+            max_chars=50,
         )
 
 # ── Formulário ─────────────────────────────────────────────────────────────
@@ -56,9 +59,10 @@ with st.form("form_novo_boleto", clear_on_submit=True):
         "Descrição *",
         placeholder="Ex: Conta de água, Netflix, Aluguel...",
         help="Nome do pagamento ou conta.",
+        max_chars=200,
     )
 
-    col_val, col_venc = st.columns(2)
+    col_val, col_rep = st.columns(2)
     with col_val:
         valor = st.number_input(
             "Valor (R$) *",
@@ -67,17 +71,9 @@ with st.form("form_novo_boleto", clear_on_submit=True):
             format="%.2f",
             help="Valor exato do pagamento.",
         )
-    with col_venc:
-        vencimento = st.date_input(
-            "Data de vencimento *",
-            value=date.today(),
-            help="Dia em que o pagamento vence.",
-        )
-
-    _, col_rep = st.columns(2)
     with col_rep:
         repetir = st.number_input(
-            "Repetir por quantos meses?",
+            "Repetir (meses)",
             min_value=1,
             max_value=24,
             value=1,
@@ -85,37 +81,50 @@ with st.form("form_novo_boleto", clear_on_submit=True):
             help="1 = sem repetição. Ex: 3 cria pagamentos para este e os 2 meses seguintes.",
         )
 
+    vencimento = st.date_input(
+        "Data de vencimento *",
+        value=date.today(),
+        help="Dia em que o pagamento vence.",
+    )
+
     submitted = st.form_submit_button("💾 Salvar pagamento", use_container_width=True, type="primary")
 
     if submitted:
-        if not descricao.strip():
+        if vencimento is None:
+            st.error("Selecione uma data de vencimento.")
+        elif not descricao.strip():
             st.error("A descrição é obrigatória.")
         elif valor <= 0:
             st.error("O valor deve ser maior que zero.")
         else:
-            if storage.check_duplicate(descricao.strip(), vencimento.strftime("%Y-%m-%d")):
-                st.warning(f"⚠️ Já existe um pagamento **{descricao.strip()}** com vencimento em {vencimento.strftime('%d/%m/%Y')}. O pagamento foi salvo mesmo assim.")
+            try:
+                if boleto_svc.verificar_duplicata(descricao.strip(), vencimento.strftime("%Y-%m-%d")):
+                    st.warning(f"⚠️ Já existe um pagamento **{descricao.strip()}** com vencimento em {vencimento.strftime('%d/%m/%Y')}. O pagamento foi salvo mesmo assim.")
 
-            categoria_final = None
-            if cat_escolhida == "+ Nova categoria..." and nova_cat and nova_cat.strip():
-                storage.create_categoria(nova_cat.strip())
-                categoria_final = nova_cat.strip()
-                # Pré-seleciona a nova categoria criada na próxima renderização
-                st.session_state.cat_selecionada = nova_cat.strip()
-            elif cat_escolhida and cat_escolhida != "+ Nova categoria...":
-                categoria_final = cat_escolhida
+                categoria_final = None
+                if cat_escolhida == "+ Nova categoria..." and nova_cat and nova_cat.strip():
+                    with st.spinner("Salvando categoria..."):
+                        storage.create_categoria(nova_cat.strip())
+                    categoria_final = nova_cat.strip()
+                    st.session_state.cat_selecionada = nova_cat.strip()
+                elif cat_escolhida and cat_escolhida != "+ Nova categoria...":
+                    categoria_final = cat_escolhida
 
-            competencia = vencimento.strftime("%Y-%m")
-            storage.create_recurring(
-                descricao=descricao.strip(),
-                valor=valor,
-                vencimento=vencimento.strftime("%Y-%m-%d"),
-                competencia=competencia,
-                categoria=categoria_final,
-                meses=int(repetir),
-            )
+                competencia = vencimento.strftime("%Y-%m")
+                label_spinner = "Salvando pagamento..." if repetir == 1 else f"Criando {int(repetir)} pagamentos..."
+                with st.spinner(label_spinner):
+                    boleto_svc.criar_recorrente(
+                        descricao=descricao.strip(),
+                        valor=valor,
+                        vencimento=vencimento.strftime("%Y-%m-%d"),
+                        competencia=competencia,
+                        categoria=categoria_final,
+                        meses=int(repetir),
+                    )
 
-            if repetir == 1:
-                st.success(f"Pagamento **{descricao.strip()}** registrado para {competencia}.")
-            else:
-                st.success(f"**{int(repetir)} pagamentos** de *{descricao.strip()}* criados a partir de {competencia}.")
+                if repetir == 1:
+                    st.toast(f"Pagamento '{descricao.strip()}' registrado para {competencia}.", icon="✅")
+                else:
+                    st.toast(f"{int(repetir)} pagamentos de '{descricao.strip()}' criados a partir de {competencia}.", icon="✅")
+            except RuntimeError as e:
+                st.error(str(e))

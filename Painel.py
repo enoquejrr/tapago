@@ -1,5 +1,8 @@
 """Dashboard — visão do mês atual."""
+import html as _html
 import streamlit as st
+from app_logging import setup_logging
+setup_logging()
 from datetime import datetime, timedelta
 from auth import check_auth, sidebar_logout
 from storage_service import StorageService
@@ -10,13 +13,8 @@ from utils import (
     days_until_due,
     is_overdue,
     is_due_soon,
+    MESES_PT,
 )
-
-MESES_PT = {
-    "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
-    "05": "Maio", "06": "Junho", "07": "Julho", "08": "Agosto",
-    "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro",
-}
 
 st.markdown("""
 <style>
@@ -72,7 +70,12 @@ with col_nav:
 st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
 
 # ── Dados ───────────────────────────────────────────────────────────────────
-boletos = storage.get_by_month(st.session_state.current_month)
+try:
+    boletos = storage.get_by_month(st.session_state.current_month)
+except RuntimeError as e:
+    st.error(str(e))
+    st.stop()
+
 total_mes = sum(b["valor"] for b in boletos)
 total_pago = sum(b["valor"] for b in boletos if b["pago"])
 total_pendente = total_mes - total_pago
@@ -93,8 +96,16 @@ st.divider()
 
 # ── Lista de boletos ─────────────────────────────────────────────────────────
 if not boletos:
-    st.info("Nenhum boleto cadastrado para este mês. Use **Novo Boleto** na barra lateral para adicionar.")
+    st.info("Nenhum pagamento cadastrado para este mês. Use **Novo Pagamento** na barra lateral para adicionar.")
 else:
+    # ── Filtro por categoria ─────────────────────────────────────────────────
+    categorias_mes = sorted({b["categoria"] for b in boletos if b.get("categoria")})
+    if categorias_mes:
+        cat_opcoes = ["Todas"] + categorias_mes
+        cat_filtro = st.selectbox("Filtrar por categoria:", cat_opcoes, key="painel_cat_filtro")
+        if cat_filtro != "Todas":
+            boletos = [b for b in boletos if b.get("categoria") == cat_filtro]
+
     vencidos = [b for b in boletos if not b["pago"] and is_overdue(b["vencimento"])]
     proximos = [b for b in boletos if not b["pago"] and is_due_soon(b["vencimento"])]
     normais  = [b for b in boletos if not b["pago"] and not is_overdue(b["vencimento"]) and not is_due_soon(b["vencimento"])]
@@ -102,10 +113,12 @@ else:
 
     def card(b: dict, border_color: str, status_text: str, btn_key: str, undo: bool = False) -> None:
         cat = b.get("categoria") or ""
+        descricao_safe = _html.escape(b["descricao"])
+        cat_safe = _html.escape(cat)
         cat_html = (
             f'<span style="background:#EEF2FF; color:#4F46E5; padding:1px 8px; '
-            f'border-radius:999px; font-size:11px; margin-left:8px">{cat}</span>'
-            if cat else ""
+            f'border-radius:999px; font-size:11px; margin-left:8px">{cat_safe}</span>'
+            if cat_safe else ""
         )
         valor_color = "#94A3B8" if undo else border_color
         col_info, col_btn = st.columns([7, 1])
@@ -116,7 +129,7 @@ else:
                     box-shadow:0 1px 2px rgba(0,0,0,0.05)">
                     <div style="display:flex; justify-content:space-between; align-items:center">
                         <div>
-                            <strong style="font-size:15px; color:#1E293B">{b['descricao']}</strong>
+                            <strong style="font-size:15px; color:#1E293B">{descricao_safe}</strong>
                             {cat_html}
                         </div>
                         <strong style="color:{valor_color}; font-size:15px">{format_currency(b['valor'])}</strong>
@@ -130,7 +143,11 @@ else:
             label = "↩️" if undo else "✓"
             help_text = "Desfazer pagamento" if undo else "Marcar como pago"
             if st.button(label, key=btn_key, use_container_width=True, help=help_text):
-                storage.update_status(b["id"], not undo)
+                try:
+                    with st.spinner("Atualizando..."):
+                        storage.update_status(b["id"], not undo)
+                except RuntimeError as e:
+                    st.error(str(e))
                 st.rerun()
 
     if vencidos:
@@ -171,4 +188,4 @@ else:
 
 # ── Rodapé ───────────────────────────────────────────────────────────────────
 st.divider()
-st.caption("🔒 Dados salvos no Supabase · Tá Pago?")
+st.caption("🔒 Seus dados são privados · [Política de Privacidade](views/4_Privacidade.py) · Tá Pago?")

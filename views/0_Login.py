@@ -1,6 +1,40 @@
 """Tela de login, cadastro e recuperação de senha."""
+import time
 import streamlit as st
 from auth import get_client
+import pages
+
+_MAX_TENTATIVAS = 5
+_BLOQUEIO_SEGUNDOS = 60
+
+
+def _check_rate_limit() -> bool:
+    """Retorna True se o login está bloqueado. Exibe aviso com tempo restante."""
+    agora = time.time()
+    bloqueado_ate = st.session_state.get("login_bloqueado_ate", 0)
+    if agora < bloqueado_ate:
+        restante = int(bloqueado_ate - agora)
+        st.error(f"Muitas tentativas. Aguarde {restante}s para tentar novamente.")
+        return True
+    return False
+
+
+def _registrar_falha() -> None:
+    """Incrementa contador de falhas; bloqueia após MAX_TENTATIVAS."""
+    agora = time.time()
+    # Zera contador se o bloqueio anterior já expirou
+    if agora >= st.session_state.get("login_bloqueado_ate", 0):
+        tentativas = st.session_state.get("login_tentativas", 0) + 1
+        st.session_state["login_tentativas"] = tentativas
+        if tentativas >= _MAX_TENTATIVAS:
+            st.session_state["login_bloqueado_ate"] = agora + _BLOQUEIO_SEGUNDOS
+            st.session_state["login_tentativas"] = 0
+
+
+def _registrar_sucesso() -> None:
+    """Zera contadores após login bem-sucedido."""
+    st.session_state.pop("login_tentativas", None)
+    st.session_state.pop("login_bloqueado_ate", None)
 
 st.markdown("""
 <style>
@@ -11,7 +45,7 @@ st.markdown("""
 
 # Se já está logado, vai direto para o painel
 if st.session_state.get("user"):
-    st.switch_page("Painel.py")
+    st.switch_page(pages.PAINEL)
 
 st.markdown(
     "<h2 style='text-align:center; color:#1E293B; margin-bottom:4px'>💸 Tá Pago?</h2>",
@@ -34,22 +68,30 @@ with tab_entrar:
         submitted = st.form_submit_button("Entrar", use_container_width=True, type="primary")
 
     if submitted:
-        if not email or not senha:
+        if _check_rate_limit():
+            pass  # mensagem já exibida dentro de _check_rate_limit
+        elif not email or not senha:
             st.error("Preencha email e senha.")
         else:
             try:
-                res = client.auth.sign_in_with_password({"email": email, "password": senha})
+                with st.spinner("Entrando..."):
+                    res = client.auth.sign_in_with_password({"email": email, "password": senha})
+                _registrar_sucesso()
                 st.session_state["user"] = res.user
                 st.session_state["access_token"] = res.session.access_token
                 st.rerun()
             except Exception as e:
+                _registrar_falha()
                 msg = str(e).lower()
                 if "invalid" in msg or "credentials" in msg:
-                    st.error("Email ou senha incorretos.")
+                    tentativas = st.session_state.get("login_tentativas", 0)
+                    restantes = max(0, _MAX_TENTATIVAS - tentativas)
+                    aviso = f" ({restantes} tentativa(s) restante(s))" if restantes > 0 else ""
+                    st.error(f"Email ou senha incorretos.{aviso}")
                 elif "confirmed" in msg or "not confirmed" in msg:
                     st.warning("Confirme seu email antes de entrar. Verifique sua caixa de entrada.")
                 else:
-                    st.error(f"Erro ao entrar: {e}")
+                    st.error("Erro ao entrar. Tente novamente.")
 
 # ── Criar conta ──────────────────────────────────────────────────────────────
 with tab_cadastro:

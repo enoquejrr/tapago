@@ -1,13 +1,20 @@
 """Autenticação via Supabase Auth."""
 import streamlit as st
 from supabase import create_client, Client
+import pages
 
 
-def get_client() -> Client:
+@st.cache_resource
+def _get_auth_client() -> Client:
+    """Cria e cacheia o client de autenticação Supabase."""
     return create_client(
         st.secrets["supabase"]["url"],
         st.secrets["supabase"]["key"],
     )
+
+
+def get_client() -> Client:
+    return _get_auth_client()
 
 
 def check_auth() -> str:
@@ -27,7 +34,7 @@ def check_auth() -> str:
             st.session_state.pop("access_token", None)
 
     # Sem sessão válida — redireciona para login
-    st.switch_page("views/0_Login.py")
+    st.switch_page(pages.LOGIN)
     st.stop()
 
 
@@ -40,7 +47,7 @@ def logout():
         pass
     st.session_state.pop("user", None)
     st.session_state.pop("access_token", None)
-    st.switch_page("views/0_Login.py")
+    st.switch_page(pages.LOGIN)
 
 
 def sidebar_logout():
