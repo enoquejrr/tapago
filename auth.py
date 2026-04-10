@@ -47,6 +47,7 @@ def logout():
         pass
     st.session_state.pop("user", None)
     st.session_state.pop("access_token", None)
+    st.session_state.pop("supabase_client", None)  # força novo client no próximo login
     st.switch_page(pages.LOGIN)
 
 

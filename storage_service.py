@@ -12,27 +12,34 @@ from supabase import create_client, Client
 logger = logging.getLogger(__name__)
 
 
-@st.cache_resource
-def _get_supabase_client() -> Client:
-    """Cria e cacheia o client Supabase (uma instância por processo do servidor)."""
+def _get_supabase_client(access_token: str = None) -> Client:
+    """Retorna client Supabase isolado por sessão de usuário.
+
+    Usa st.session_state em vez de @st.cache_resource para evitar que o
+    token de um usuário sobrescreva o de outro no objeto compartilhado.
+    """
     try:
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"]["key"]
     except Exception:
         url = os.environ.get("SUPABASE_URL", "")
         key = os.environ.get("SUPABASE_KEY", "")
-    return create_client(url, key)
+
+    if "supabase_client" not in st.session_state:
+        st.session_state["supabase_client"] = create_client(url, key)
+
+    client: Client = st.session_state["supabase_client"]
+    if access_token:
+        client.postgrest.auth(access_token)
+    return client
 
 
 class StorageService:
     """Gerencia leitura, escrita e atualização de boletos no Supabase."""
 
     def __init__(self, usuario: str = None, access_token: str = None):
-        self.client: Client = _get_supabase_client()
+        self.client: Client = _get_supabase_client(access_token)
         self.usuario = usuario
-        # Injeta o JWT do usuário logado para que auth.uid() funcione no RLS
-        if access_token:
-            self.client.postgrest.auth(access_token)
 
     def _row(self, r: dict) -> Boleto:
         """Normaliza resposta do Supabase para o formato esperado pelo app."""
