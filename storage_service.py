@@ -196,9 +196,12 @@ class StorageService:
     def create_categoria(self, nome: str) -> None:
         """Salva nova categoria para o usuário logado (ignora duplicatas)."""
         try:
-            self.client.table("categorias").upsert(
+            self.client.table("categorias").insert(
                 {"nome": nome, "usuario": self.usuario}
             ).execute()
         except Exception as e:
+            msg = str(e).lower()
+            if "duplicate" in msg or "unique" in msg or "23505" in msg:
+                return  # categoria já existe para este usuário — sem erro
             logger.error("Erro ao criar categoria: %s", e, exc_info=True)
             raise RuntimeError("Não foi possível salvar a categoria. Tente novamente.") from e
