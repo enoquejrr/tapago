@@ -10,7 +10,7 @@ st.set_page_config(
 
 pg = st.navigation([
     st.Page("Painel.py",                   title="Painel",      icon="💸"),
-    st.Page("views/1_Novo_Boleto.py",      title="Novo Boleto", icon="➕"),
+    st.Page("views/1_Novo_Boleto.py",      title="Novo Pagamento", icon="➕"),
     st.Page("views/2_Historico.py",        title="Histórico",   icon="📊"),
 ])
 pg.run()
