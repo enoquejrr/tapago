@@ -88,6 +88,8 @@ with tab_entrar:
                     restantes = max(0, _MAX_TENTATIVAS - tentativas)
                     aviso = f" ({restantes} tentativa(s) restante(s))" if restantes > 0 else ""
                     st.error(f"Email ou senha incorretos.{aviso}")
+                elif "confirmed" in msg or "not confirmed" in msg:
+                    st.warning("Confirme seu email antes de entrar. Verifique sua caixa de entrada.")
                 else:
                     st.error("Erro ao entrar. Tente novamente.")
 
@@ -109,8 +111,7 @@ with tab_cadastro:
         else:
             try:
                 client.auth.sign_up({"email": email_c, "password": senha_c})
-                st.success("Conta criada com sucesso! Agora entre com seu email e senha.")
-                st.session_state["login_tab"] = "entrar"
+                st.success("Conta criada! Verifique seu email e clique no link de confirmação antes de entrar.")
             except Exception as e:
                 msg = str(e).lower()
                 if "already" in msg or "registered" in msg:
