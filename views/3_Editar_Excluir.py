@@ -153,6 +153,52 @@ elif not em_edicao and selecionados:
 
 st.divider()
 
+# ── Seleção rápida por nome ──────────────────────────────────────────────────
+if not em_edicao:
+    # Agrupa por descrição para montar o painel
+    por_nome: dict[str, list] = defaultdict(list)
+    for b in todos_boletos:
+        por_nome[b["descricao"]].append(b)
+
+    # Só mostra o painel se houver nomes com mais de 1 ocorrência
+    nomes_repetidos = {nome: boletos for nome, boletos in por_nome.items() if len(boletos) > 1}
+
+    if nomes_repetidos:
+        with st.expander("⚡ Seleção rápida por nome", expanded=True):
+            st.markdown(
+                "<p style='color:#64748B; font-size:13px; margin-top:0; margin-bottom:12px'>"
+                "Selecione todas as ocorrências de um pagamento de uma vez.</p>",
+                unsafe_allow_html=True,
+            )
+            for nome, boletos_nome in sorted(nomes_repetidos.items()):
+                ids_nome = [b["id"] for b in boletos_nome]
+                total_valor = sum(b["valor"] for b in boletos_nome)
+                n_sel = sum(1 for bid in ids_nome if st.session_state.get(f"chk_{bid}"))
+                todos_sel = n_sel == len(ids_nome)
+
+                col_desc, col_info_rapido, col_btn_rapido = st.columns([4, 3, 2])
+                with col_desc:
+                    badge = f" <span style='color:#4F46E5; font-weight:700'>[{n_sel}/{len(ids_nome)}]</span>" if n_sel else ""
+                    st.markdown(
+                        f"<div style='padding:8px 0'>"
+                        f"<strong>{_html.escape(nome)}</strong>{badge}<br>"
+                        f"<span style='color:#64748B; font-size:12px'>"
+                        f"{len(ids_nome)}x · {format_currency(total_valor)} no total</span>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                with col_info_rapido:
+                    st.markdown("<div style='padding:8px 0'></div>", unsafe_allow_html=True)
+                with col_btn_rapido:
+                    st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
+                    label = "☐ Desmarcar" if todos_sel else "☑ Selecionar todas"
+                    if st.button(label, key=f"rapido_{nome}", use_container_width=True):
+                        for bid in ids_nome:
+                            st.session_state[f"chk_{bid}"] = not todos_sel
+                        st.rerun()
+
+        st.divider()
+
 # ── Lista por mês ────────────────────────────────────────────────────────────
 mes_atual = datetime.now().strftime("%Y-%m")
 
@@ -213,7 +259,6 @@ for mes in meses_ordenados:
                 st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
                 if st.button("✏️", key=f"edit_{b['id']}", help="Editar este pagamento"):
                     st.session_state.editando_id = b["id"]
-                    # Limpa seleções ao entrar no modo edição
                     for bid in [bl["id"] for bl in todos_boletos]:
                         st.session_state[f"chk_{bid}"] = False
                     st.session_state.confirm_delete = False
