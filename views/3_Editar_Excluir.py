@@ -231,7 +231,7 @@ if not em_edicao:
     nomes_repetidos = {nome: boletos for nome, boletos in por_nome.items() if len(boletos) > 1}
 
     if nomes_repetidos:
-        with st.expander("⚡ Seleção rápida por nome", expanded=True):
+        with st.expander("⚡ Seleção rápida por categoria", expanded=False):
             st.markdown(
                 "<p style='color:#64748B; font-size:13px; margin-top:0; margin-bottom:12px'>"
                 "Selecione todas as ocorrências de um pagamento de uma vez.</p>",
