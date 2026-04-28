@@ -25,6 +25,8 @@ if "confirm_delete" not in st.session_state:
     st.session_state.confirm_delete = False
 if "editando_id" not in st.session_state:
     st.session_state.editando_id = None
+if "editando_grupo" not in st.session_state:
+    st.session_state.editando_grupo = None
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
 st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>✏️ Editar / Excluir Pagamentos</h2>", unsafe_allow_html=True)
@@ -107,8 +109,73 @@ if st.session_state.editando_id:
 
     st.divider()
 
+# ── Modo edição em grupo (seleção rápida) ────────────────────────────────────
+if st.session_state.editando_grupo:
+    nome_grupo = st.session_state.editando_grupo
+    boletos_grupo = [b for b in todos_boletos if b["descricao"] == nome_grupo]
+
+    if not boletos_grupo:
+        st.session_state.editando_grupo = None
+        st.rerun()
+
+    st.markdown(
+        f"<div style='background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:16px 20px; margin-bottom:16px'>"
+        f"<strong style='color:#15803D'>✏️ Editando {len(boletos_grupo)} ocorrência(s) de: {_html.escape(nome_grupo)}</strong><br>"
+        f"<span style='color:#64748B; font-size:12px'>Descrição e valor serão aplicados a todas as ocorrências. "
+        f"Para alterar datas individualmente, use o ✏️ na lista por mês abaixo.</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    categorias_g = storage.get_categorias()
+    cat_atual_g = boletos_grupo[0].get("categoria")
+    cat_opcoes_g = ["(sem categoria)"] + categorias_g
+    cat_index_g = cat_opcoes_g.index(cat_atual_g) if cat_atual_g in cat_opcoes_g else 0
+
+    with st.form("form_edicao_grupo"):
+        col1g, col2g = st.columns(2)
+        with col1g:
+            nova_categoria_g = st.selectbox("Categoria", cat_opcoes_g, index=cat_index_g)
+            nova_descricao_g = st.text_input("Descrição", value=nome_grupo, max_chars=200)
+        with col2g:
+            novo_valor_g = st.number_input(
+                "Valor (R$)", min_value=0.01, step=0.01,
+                value=boletos_grupo[0]["valor"], format="%.2f",
+            )
+
+        c_sg, c_cg = st.columns(2)
+        salvar_g = c_sg.form_submit_button("✓ Salvar em todas", type="primary", use_container_width=True)
+        cancelar_g = c_cg.form_submit_button("✗ Cancelar", use_container_width=True)
+
+    if salvar_g:
+        if not nova_descricao_g.strip():
+            st.error("A descrição não pode estar vazia.")
+        else:
+            cat_final_g = None if nova_categoria_g == "(sem categoria)" else nova_categoria_g
+            try:
+                with st.spinner(f"Atualizando {len(boletos_grupo)} pagamento(s)..."):
+                    for b in boletos_grupo:
+                        storage.update(
+                            boleto_id=b["id"],
+                            descricao=nova_descricao_g.strip(),
+                            valor=novo_valor_g,
+                            vencimento=b["vencimento"],
+                            categoria=cat_final_g,
+                        )
+                st.session_state.editando_grupo = None
+                st.toast(f"{len(boletos_grupo)} pagamento(s) atualizado(s) com sucesso.", icon="✅")
+            except RuntimeError as e:
+                st.error(str(e))
+            st.rerun()
+
+    if cancelar_g:
+        st.session_state.editando_grupo = None
+        st.rerun()
+
+    st.divider()
+
 # ── IDs selecionados (calculado dos checkboxes atuais) ───────────────────────
-em_edicao = st.session_state.editando_id is not None
+em_edicao = st.session_state.editando_id is not None or st.session_state.editando_grupo is not None
 selecionados = [b["id"] for b in todos_boletos if st.session_state.get(f"chk_{b['id']}")]
 
 # ── Bloco de confirmação ─────────────────────────────────────────────────────
@@ -176,7 +243,7 @@ if not em_edicao:
                 n_sel = sum(1 for bid in ids_nome if st.session_state.get(f"chk_{bid}"))
                 todos_sel = n_sel == len(ids_nome)
 
-                col_desc, col_info_rapido, col_btn_rapido = st.columns([4, 3, 2])
+                col_desc, col_btn_sel, col_btn_edit = st.columns([4, 2, 1])
                 with col_desc:
                     badge = f" <span style='color:#4F46E5; font-weight:700'>[{n_sel}/{len(ids_nome)}]</span>" if n_sel else ""
                     st.markdown(
@@ -187,14 +254,18 @@ if not em_edicao:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
-                with col_info_rapido:
-                    st.markdown("<div style='padding:8px 0'></div>", unsafe_allow_html=True)
-                with col_btn_rapido:
+                with col_btn_sel:
                     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
                     label = "☐ Desmarcar" if todos_sel else "☑ Selecionar todas"
                     if st.button(label, key=f"rapido_{nome}", use_container_width=True):
                         for bid in ids_nome:
                             st.session_state[f"chk_{bid}"] = not todos_sel
+                        st.rerun()
+                with col_btn_edit:
+                    st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
+                    if st.button("✏️", key=f"rapido_edit_{nome}", help=f"Editar todas as ocorrências de '{nome}'"):
+                        st.session_state.editando_grupo = nome
+                        st.session_state.editando_id = None
                         st.rerun()
 
         st.divider()
