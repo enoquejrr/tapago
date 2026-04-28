@@ -57,6 +57,6 @@ def sidebar_logout():
     if user:
         with st.sidebar:
             st.markdown("---")
-            st.caption(f"👤 {user.email}")
+            st.caption("👤 supporttapago@gmail.com")
             if st.button("Sair", use_container_width=True):
                 logout()
