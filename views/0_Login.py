@@ -56,6 +56,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown(
+    "<p style='text-align:center; color:#94A3B8; font-size:13px; margin-bottom:24px'>"
+    "📧 supporttapago@gmail.com</p>",
+    unsafe_allow_html=True,
+)
+
 tab_entrar, tab_cadastro, tab_senha = st.tabs(["Entrar", "Criar conta", "Esqueci a senha"])
 
 client = get_client()
