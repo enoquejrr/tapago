@@ -142,6 +142,21 @@ class StorageService:
             logger.error("Erro ao atualizar status do boleto %s: %s", boleto_id, e, exc_info=True)
             raise RuntimeError("Não foi possível atualizar o status. Tente novamente.") from e
 
+    def update(self, boleto_id: str, descricao: str, valor: float,
+               vencimento: str, categoria: str | None) -> None:
+        """Atualiza os dados de um boleto existente."""
+        try:
+            self.client.table("boletos").update({
+                "descricao": descricao,
+                "valor": valor,
+                "vencimento": vencimento,
+                "competencia": vencimento[:7],
+                "categoria": categoria,
+            }).eq("id", boleto_id).eq("usuario", self.usuario).execute()
+        except Exception as e:
+            logger.error("Erro ao atualizar boleto %s: %s", boleto_id, e, exc_info=True)
+            raise RuntimeError("Não foi possível atualizar o pagamento. Tente novamente.") from e
+
     def delete(self, boleto_id: str) -> None:
         """Remove um boleto."""
         try:

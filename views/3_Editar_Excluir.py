@@ -1,6 +1,6 @@
-"""Página de exclusão de pagamentos com seleção múltipla."""
+"""Página de edição e exclusão de pagamentos."""
 import html as _html
-from datetime import datetime
+from datetime import datetime, date
 import streamlit as st
 from collections import defaultdict
 from auth import check_auth, sidebar_logout
@@ -23,10 +23,12 @@ if "ids_para_excluir" not in st.session_state:
     st.session_state.ids_para_excluir = []
 if "confirm_delete" not in st.session_state:
     st.session_state.confirm_delete = False
+if "editando_id" not in st.session_state:
+    st.session_state.editando_id = None
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
-st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>🗑️ Excluir Pagamentos</h2>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B; margin-top:0'>Selecione os pagamentos que deseja remover.</p>", unsafe_allow_html=True)
+st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>✏️ Editar / Excluir Pagamentos</h2>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748B; margin-top:0'>Selecione para excluir ou clique em ✏️ para editar.</p>", unsafe_allow_html=True)
 st.divider()
 
 try:
@@ -45,11 +47,72 @@ for b in todos_boletos:
     if key not in st.session_state:
         st.session_state[key] = False
 
+# ── Modo edição ──────────────────────────────────────────────────────────────
+if st.session_state.editando_id:
+    boleto_edit = next((b for b in todos_boletos if b["id"] == st.session_state.editando_id), None)
+
+    if boleto_edit is None:
+        st.session_state.editando_id = None
+        st.rerun()
+
+    st.markdown(
+        f"<div style='background:#F0F9FF; border:1px solid #BAE6FD; border-radius:10px; padding:16px 20px; margin-bottom:16px'>"
+        f"<strong style='color:#0369A1'>✏️ Editando: {_html.escape(boleto_edit['descricao'])}</strong>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    categorias = storage.get_categorias()
+    cat_atual = boleto_edit.get("categoria")
+    cat_opcoes = ["(sem categoria)"] + categorias
+    cat_index = cat_opcoes.index(cat_atual) if cat_atual in cat_opcoes else 0
+
+    with st.form("form_edicao"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nova_categoria = st.selectbox("Categoria", cat_opcoes, index=cat_index)
+            nova_descricao = st.text_input("Descrição", value=boleto_edit["descricao"], max_chars=200)
+        with col2:
+            novo_valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01, value=boleto_edit["valor"], format="%.2f")
+            venc_atual = date.fromisoformat(boleto_edit["vencimento"])
+            novo_vencimento = st.date_input("Data de vencimento", value=venc_atual)
+
+        c_salvar, c_cancelar = st.columns(2)
+        salvar = c_salvar.form_submit_button("✓ Salvar alterações", type="primary", use_container_width=True)
+        cancelar = c_cancelar.form_submit_button("✗ Cancelar", use_container_width=True)
+
+    if salvar:
+        if not nova_descricao.strip():
+            st.error("A descrição não pode estar vazia.")
+        else:
+            cat_final = None if nova_categoria == "(sem categoria)" else nova_categoria
+            try:
+                with st.spinner("Salvando alterações..."):
+                    storage.update(
+                        boleto_id=st.session_state.editando_id,
+                        descricao=nova_descricao.strip(),
+                        valor=novo_valor,
+                        vencimento=str(novo_vencimento),
+                        categoria=cat_final,
+                    )
+                st.session_state.editando_id = None
+                st.toast("Pagamento atualizado com sucesso.", icon="✅")
+            except RuntimeError as e:
+                st.error(str(e))
+            st.rerun()
+
+    if cancelar:
+        st.session_state.editando_id = None
+        st.rerun()
+
+    st.divider()
+
 # ── IDs selecionados (calculado dos checkboxes atuais) ───────────────────────
+em_edicao = st.session_state.editando_id is not None
 selecionados = [b["id"] for b in todos_boletos if st.session_state.get(f"chk_{b['id']}")]
 
 # ── Bloco de confirmação ─────────────────────────────────────────────────────
-if st.session_state.confirm_delete and st.session_state.ids_para_excluir:
+if not em_edicao and st.session_state.confirm_delete and st.session_state.ids_para_excluir:
     n = len(st.session_state.ids_para_excluir)
     st.warning(f"⚠️ Você está prestes a excluir **{n} pagamento(s)**. Esta ação **não pode ser desfeita**.")
     c1, c2 = st.columns(2)
@@ -74,7 +137,7 @@ if st.session_state.confirm_delete and st.session_state.ids_para_excluir:
         st.rerun()
 
 # ── Barra de ação ────────────────────────────────────────────────────────────
-elif selecionados:
+elif not em_edicao and selecionados:
     col_info, col_btn = st.columns([3, 2])
     with col_info:
         st.markdown(
@@ -108,32 +171,35 @@ for mes in meses_ordenados:
         titulo += f" · {n_sel_mes} selecionado(s)"
 
     with st.expander(titulo, expanded=(mes == mes_atual)):
-        col_sel, col_desel = st.columns(2)
-        with col_sel:
-            if st.button("☑ Selecionar todos", key=f"sel_{mes}", use_container_width=True):
-                for bid in ids_mes:
-                    st.session_state[f"chk_{bid}"] = True
-                st.rerun()
-        with col_desel:
-            if st.button("☐ Desmarcar todos", key=f"desel_{mes}", use_container_width=True):
-                for bid in ids_mes:
-                    st.session_state[f"chk_{bid}"] = False
-                st.rerun()
+        if not em_edicao:
+            col_sel, col_desel = st.columns(2)
+            with col_sel:
+                if st.button("☑ Selecionar todos", key=f"sel_{mes}", use_container_width=True):
+                    for bid in ids_mes:
+                        st.session_state[f"chk_{bid}"] = True
+                    st.rerun()
+            with col_desel:
+                if st.button("☐ Desmarcar todos", key=f"desel_{mes}", use_container_width=True):
+                    for bid in ids_mes:
+                        st.session_state[f"chk_{bid}"] = False
+                    st.rerun()
 
         st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
 
         for b in boletos_mes:
-            col_chk, col_info = st.columns([0.5, 9])
+            col_chk, col_info, col_edit = st.columns([0.5, 8, 1])
             with col_chk:
                 st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
-                st.checkbox("", key=f"chk_{b['id']}", label_visibility="collapsed")
+                st.checkbox("", key=f"chk_{b['id']}", label_visibility="collapsed", disabled=em_edicao)
             with col_info:
                 cat_raw = f" · {b['categoria']}" if b.get("categoria") else ""
                 cat = _html.escape(cat_raw)
                 descricao_safe = _html.escape(b["descricao"])
                 status = "✅" if b["pago"] else "⏳"
+                is_editing_this = b["id"] == st.session_state.editando_id
+                bg = "background:#EFF6FF;" if is_editing_this else ""
                 st.markdown(
-                    f"<div style='padding:6px 0; border-bottom:1px solid #F1F5F9'>"
+                    f"<div style='padding:6px 0; border-bottom:1px solid #F1F5F9; {bg}'>"
                     f"<strong>{descricao_safe}</strong>"
                     f"<span style='color:#64748B; font-size:13px'>{cat}</span>"
                     f"&nbsp;&nbsp;"
@@ -143,3 +209,13 @@ for mes in meses_ordenados:
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+            with col_edit:
+                st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
+                if st.button("✏️", key=f"edit_{b['id']}", help="Editar este pagamento"):
+                    st.session_state.editando_id = b["id"]
+                    # Limpa seleções ao entrar no modo edição
+                    for bid in [bl["id"] for bl in todos_boletos]:
+                        st.session_state[f"chk_{bid}"] = False
+                    st.session_state.confirm_delete = False
+                    st.session_state.ids_para_excluir = []
+                    st.rerun()
