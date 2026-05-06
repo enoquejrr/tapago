@@ -169,7 +169,8 @@ else:
         )
         for b in proximos:
             dias = days_until_due(b["vencimento"])
-            card(b, "#F59E0B", f"Vence em {dias} dia(s) — {format_date_br(b['vencimento'])}", f"p_{b['id']}")
+            label_dias = "Vence hoje" if dias == 0 else f"Vence em {dias} dia(s)"
+            card(b, "#F59E0B", f"{label_dias} — {format_date_br(b['vencimento'])}", f"p_{b['id']}")
 
     if normais:
         st.markdown(
@@ -179,7 +180,8 @@ else:
         )
         for b in normais:
             dias = days_until_due(b["vencimento"])
-            card(b, "#10B981", f"Vence em {dias} dia(s) — {format_date_br(b['vencimento'])}", f"n_{b['id']}")
+            label_dias = "Vence hoje" if dias == 0 else f"Vence em {dias} dia(s)"
+            card(b, "#10B981", f"{label_dias} — {format_date_br(b['vencimento'])}", f"n_{b['id']}")
 
     if pagos:
         st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
