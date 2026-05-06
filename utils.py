@@ -1,5 +1,8 @@
 """Funções utilitárias para lógica de datas e formatação."""
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+_TZ = ZoneInfo("America/Sao_Paulo")
 
 MESES_PT = {
     "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
@@ -10,13 +13,13 @@ MESES_PT = {
 
 def get_current_month() -> str:
     """Retorna competência atual no formato YYYY-MM."""
-    return datetime.now().strftime("%Y-%m")
+    return datetime.now(_TZ).strftime("%Y-%m")
 
 
 def days_until_due(vencimento: str) -> int:
     """Calcula dias até vencimento. Retorna negativo se vencido."""
     due_date = datetime.strptime(vencimento, "%Y-%m-%d").date()
-    today = datetime.now().date()
+    today = datetime.now(_TZ).date()
     return (due_date - today).days
 
 

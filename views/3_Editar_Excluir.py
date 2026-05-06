@@ -5,7 +5,7 @@ import streamlit as st
 from collections import defaultdict
 from auth import check_auth, sidebar_logout
 from storage_service import StorageService
-from utils import format_currency, format_date_br, MESES_PT
+from utils import format_currency, format_date_br, MESES_PT, _TZ
 
 st.markdown("""
 <style>
@@ -271,7 +271,7 @@ if not em_edicao:
         st.divider()
 
 # ── Lista por mês ────────────────────────────────────────────────────────────
-mes_atual = datetime.now().strftime("%Y-%m")
+mes_atual = datetime.now(_TZ).strftime("%Y-%m")
 
 por_mes = defaultdict(list)
 for b in todos_boletos:
@@ -331,7 +331,7 @@ for mes in meses_ordenados:
                 if st.button("✏️", key=f"edit_{b['id']}", help="Editar este pagamento"):
                     st.session_state.editando_id = b["id"]
                     for bid in [bl["id"] for bl in todos_boletos]:
-                        st.session_state[f"chk_{bid}"] = False
+                        st.session_state.pop(f"chk_{bid}", None)
                     st.session_state.confirm_delete = False
                     st.session_state.ids_para_excluir = []
                     st.rerun()
