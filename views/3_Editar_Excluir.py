@@ -228,7 +228,7 @@ if not em_edicao:
         por_nome[b["descricao"]].append(b)
 
     # Só mostra o painel se houver nomes com mais de 1 ocorrência
-    nomes_repetidos = {nome: boletos for nome, boletos in por_nome.items() if len(boletos) > 1}
+    nomes_repetidos = dict(por_nome)
 
     if nomes_repetidos:
         with st.expander("⚡ Seleção rápida por categoria", expanded=False):
