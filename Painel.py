@@ -26,6 +26,12 @@ st.markdown("""
         padding: 16px 20px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.07);
     }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        font-size: 1.2rem !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        font-size: 0.82rem !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
