@@ -1,4 +1,4 @@
-"""Página de edição e exclusão de pagamentos."""
+"""Página de edição e exclusão de pagamentos e receitas."""
 import html as _html
 from datetime import datetime, date
 import streamlit as st
@@ -29,7 +29,7 @@ if "editando_grupo" not in st.session_state:
     st.session_state.editando_grupo = None
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
-st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>✏️ Editar / Excluir Pagamentos</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>✏️ Editar / Excluir</h2>", unsafe_allow_html=True)
 st.markdown("<p style='color:#64748B; margin-top:0'>Selecione para excluir ou clique em ✏️ para editar.</p>", unsafe_allow_html=True)
 st.divider()
 
@@ -40,7 +40,7 @@ except RuntimeError as e:
     st.stop()
 
 if not todos_boletos:
-    st.info("Nenhum pagamento registrado ainda. Use **Novo Pagamento** no menu lateral para começar.")
+    st.info("Nenhum registro ainda. Use **Novo Pagamento/Receita** no menu lateral para começar.")
     st.stop()
 
 # Inicializa checkboxes para novos boletos
@@ -69,6 +69,8 @@ if st.session_state.editando_id:
     cat_opcoes = ["(sem categoria)"] + categorias
     cat_index = cat_opcoes.index(cat_atual) if cat_atual in cat_opcoes else 0
 
+    is_receita = boleto_edit.get("tipo", "pagamento") == "receita"
+
     with st.form("form_edicao"):
         col1, col2 = st.columns(2)
         with col1:
@@ -77,7 +79,8 @@ if st.session_state.editando_id:
         with col2:
             novo_valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01, value=boleto_edit["valor"], format="%.2f")
             venc_atual = date.fromisoformat(boleto_edit["vencimento"])
-            novo_vencimento = st.date_input("Data de vencimento", value=venc_atual)
+            label_data = "Data de recebimento" if is_receita else "Data de vencimento"
+            novo_vencimento = st.date_input(label_data, value=venc_atual)
 
         c_salvar, c_cancelar = st.columns(2)
         salvar = c_salvar.form_submit_button("✓ Salvar alterações", type="primary", use_container_width=True)
@@ -98,7 +101,7 @@ if st.session_state.editando_id:
                         categoria=cat_final,
                     )
                 st.session_state.editando_id = None
-                st.toast("Pagamento atualizado com sucesso.", icon="✅")
+                st.toast("Registro atualizado com sucesso.", icon="✅")
             except RuntimeError as e:
                 st.error(str(e))
             st.rerun()
@@ -153,7 +156,7 @@ if st.session_state.editando_grupo:
         else:
             cat_final_g = None if nova_categoria_g == "(sem categoria)" else nova_categoria_g
             try:
-                with st.spinner(f"Atualizando {len(boletos_grupo)} pagamento(s)..."):
+                with st.spinner(f"Atualizando {len(boletos_grupo)} registro(s)..."):
                     for b in boletos_grupo:
                         storage.update(
                             boleto_id=b["id"],
@@ -163,7 +166,7 @@ if st.session_state.editando_grupo:
                             categoria=cat_final_g,
                         )
                 st.session_state.editando_grupo = None
-                st.toast(f"{len(boletos_grupo)} pagamento(s) atualizado(s) com sucesso.", icon="✅")
+                st.toast(f"{len(boletos_grupo)} registro(s) atualizado(s) com sucesso.", icon="✅")
             except RuntimeError as e:
                 st.error(str(e))
             st.rerun()
@@ -181,18 +184,18 @@ selecionados = [b["id"] for b in todos_boletos if st.session_state.get(f"chk_{b[
 # ── Bloco de confirmação ─────────────────────────────────────────────────────
 if not em_edicao and st.session_state.confirm_delete and st.session_state.ids_para_excluir:
     n = len(st.session_state.ids_para_excluir)
-    st.warning(f"⚠️ Você está prestes a excluir **{n} pagamento(s)**. Esta ação **não pode ser desfeita**.")
+    st.warning(f"⚠️ Você está prestes a excluir **{n} registro(s)**. Esta ação **não pode ser desfeita**.")
     c1, c2 = st.columns(2)
     if c1.button("✓ Confirmar exclusão", type="primary", use_container_width=True):
         try:
             n_excluidos = len(st.session_state.ids_para_excluir)
-            with st.spinner(f"Excluindo {n_excluidos} pagamento(s)..."):
+            with st.spinner(f"Excluindo {n_excluidos} registro(s)..."):
                 for bid in st.session_state.ids_para_excluir:
                     storage.delete(bid)
                     st.session_state.pop(f"chk_{bid}", None)
             st.session_state.ids_para_excluir = []
             st.session_state.confirm_delete = False
-            st.toast(f"{n_excluidos} pagamento(s) excluído(s) com sucesso.", icon="✅")
+            st.toast(f"{n_excluidos} registro(s) excluído(s) com sucesso.", icon="✅")
         except RuntimeError as e:
             st.error(str(e))
             st.session_state.ids_para_excluir = []
@@ -209,11 +212,11 @@ elif not em_edicao and selecionados:
     with col_info:
         st.markdown(
             f"<div style='padding:10px 0; color:#1E293B; font-weight:600'>"
-            f"{len(selecionados)} pagamento(s) selecionado(s)</div>",
+            f"{len(selecionados)} registro(s) selecionado(s)</div>",
             unsafe_allow_html=True,
         )
     with col_btn:
-        if st.button(f"🗑️ Excluir {len(selecionados)} pagamento(s)", type="primary", use_container_width=True):
+        if st.button(f"🗑️ Excluir {len(selecionados)} registro(s)", type="primary", use_container_width=True):
             st.session_state.ids_para_excluir = list(selecionados)
             st.session_state.confirm_delete = True
             st.rerun()
@@ -222,19 +225,17 @@ st.divider()
 
 # ── Seleção rápida por nome ──────────────────────────────────────────────────
 if not em_edicao:
-    # Agrupa por descrição para montar o painel
     por_nome: dict[str, list] = defaultdict(list)
     for b in todos_boletos:
         por_nome[b["descricao"]].append(b)
 
-    # Só mostra o painel se houver nomes com mais de 1 ocorrência
     nomes_repetidos = dict(por_nome)
 
     if nomes_repetidos:
         with st.expander("⚡ Seleção rápida por categoria", expanded=False):
             st.markdown(
                 "<p style='color:#64748B; font-size:13px; margin-top:0; margin-bottom:12px'>"
-                "Selecione todas as ocorrências de um pagamento de uma vez.</p>",
+                "Selecione todas as ocorrências de um registro de uma vez.</p>",
                 unsafe_allow_html=True,
             )
             for nome, boletos_nome in sorted(nomes_repetidos.items()):
@@ -283,7 +284,15 @@ for mes in meses_ordenados:
     ano, num_mes = mes.split("-")
     ids_mes = [b["id"] for b in boletos_mes]
     n_sel_mes = sum(1 for bid in ids_mes if st.session_state.get(f"chk_{bid}"))
-    titulo = f"{MESES_PT[num_mes]} {ano} — {len(boletos_mes)} pagamento(s)"
+
+    n_pag = sum(1 for b in boletos_mes if b.get("tipo", "pagamento") == "pagamento")
+    n_rec = sum(1 for b in boletos_mes if b.get("tipo", "pagamento") == "receita")
+    partes = []
+    if n_pag:
+        partes.append(f"{n_pag} pagamento(s)")
+    if n_rec:
+        partes.append(f"{n_rec} receita(s)")
+    titulo = f"{MESES_PT[num_mes]} {ano} — {' · '.join(partes)}"
     if n_sel_mes:
         titulo += f" · {n_sel_mes} selecionado(s)"
 
@@ -303,7 +312,11 @@ for mes in meses_ordenados:
 
         st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
 
-        for b in boletos_mes:
+        pagamentos_mes = [b for b in boletos_mes if b.get("tipo", "pagamento") == "pagamento"]
+        receitas_mes   = [b for b in boletos_mes if b.get("tipo", "pagamento") == "receita"]
+        tem_ambos      = bool(pagamentos_mes) and bool(receitas_mes)
+
+        def render_item(b: dict, cor_valor: str, prefixo_valor: str = "") -> None:
             col_chk, col_info, col_edit = st.columns([0.5, 8, 1])
             with col_chk:
                 st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
@@ -320,7 +333,7 @@ for mes in meses_ordenados:
                     f"<strong>{descricao_safe}</strong>"
                     f"<span style='color:#64748B; font-size:13px'>{cat}</span>"
                     f"&nbsp;&nbsp;"
-                    f"<span style='color:#4F46E5; font-weight:600'>{format_currency(b['valor'])}</span>"
+                    f"<span style='color:{cor_valor}; font-weight:600'>{prefixo_valor}{format_currency(b['valor'])}</span>"
                     f"&nbsp;&nbsp;"
                     f"<span style='color:#94A3B8; font-size:12px'>Venc. {format_date_br(b['vencimento'])} {status}</span>"
                     f"</div>",
@@ -328,10 +341,29 @@ for mes in meses_ordenados:
                 )
             with col_edit:
                 st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
-                if st.button("✏️", key=f"edit_{b['id']}", help="Editar este pagamento"):
+                if st.button("✏️", key=f"edit_{b['id']}", help="Editar este registro"):
                     st.session_state.editando_id = b["id"]
                     for bid in [bl["id"] for bl in todos_boletos]:
                         st.session_state.pop(f"chk_{bid}", None)
                     st.session_state.confirm_delete = False
                     st.session_state.ids_para_excluir = []
                     st.rerun()
+
+        if tem_ambos:
+            st.markdown(
+                "<div style='color:#64748B; font-weight:700; font-size:12px; "
+                "text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px'>💸 Pagamentos</div>",
+                unsafe_allow_html=True,
+            )
+
+        for b in pagamentos_mes:
+            render_item(b, cor_valor="#4F46E5")
+
+        if tem_ambos:
+            st.markdown(
+                "<div style='color:#059669; font-weight:700; font-size:12px; "
+                "text-transform:uppercase; letter-spacing:0.05em; margin:12px 0 4px'>💰 Receitas</div>",
+                unsafe_allow_html=True,
+            )
+            for b in receitas_mes:
+                render_item(b, cor_valor="#059669", prefixo_valor="+")
