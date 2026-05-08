@@ -16,7 +16,7 @@ if not st.session_state.get("user"):
 else:
     pg = st.navigation([
         st.Page("Painel.py",               title="Painel",          icon="💸"),
-        st.Page("views/1_Novo_Boleto.py",  title="Novo Pagamento",  icon="➕"),
+        st.Page("views/1_Novo_Boleto.py",  title="Novo Pagamento/Receita",  icon="➕"),
         st.Page("views/2_Historico.py",    title="Histórico",       icon="📊"),
         st.Page("views/3_Editar_Excluir.py", title="Editar / Excluir", icon="✏️"),
         st.Page("views/4_Privacidade.py",  title="Privacidade",     icon="🔒"),

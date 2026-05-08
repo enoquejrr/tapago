@@ -92,11 +92,9 @@ with st.form("form_novo_boleto", clear_on_submit=True):
             help="1 = sem repetição. Ex: 3 cria pagamentos para este e os 2 meses seguintes.",
         )
 
-    vencimento = st.date_input(
-        "Data de vencimento *",
-        value=date.today(),
-        help="Dia em que o pagamento vence.",
-    )
+    label_data = "Data de recebimento *" if tipo == "receita" else "Data de vencimento *"
+    help_data  = "Data em que a receita foi ou será recebida." if tipo == "receita" else "Dia em que o pagamento vence."
+    vencimento = st.date_input(label_data, value=date.today(), help=help_data)
 
     label_btn = "💾 Salvar receita" if tipo == "receita" else "💾 Salvar pagamento"
     submitted = st.form_submit_button(label_btn, use_container_width=True, type="primary")
