@@ -18,7 +18,7 @@ storage = StorageService(usuario=username, access_token=st.session_state.get("ac
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
 st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>📊 Histórico</h2>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B; margin-top:0'>Consulte e filtre pagamentos registrados.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748B; margin-top:0'>Consulte e filtre pagamentos e receitas registrados.</p>", unsafe_allow_html=True)
 st.divider()
 
 try:
@@ -28,7 +28,7 @@ except RuntimeError as e:
     st.stop()
 
 if not todos_boletos:
-    st.info("Nenhum pagamento registrado ainda. Use **Novo Pagamento** no menu lateral para começar.")
+    st.info("Nenhum registro ainda. Use **Novo Pagamento / Receita** no menu lateral para começar.")
     st.stop()
 
 meses = sorted({b["competencia"] for b in todos_boletos}, reverse=True)
@@ -59,7 +59,7 @@ total_filtrados = len(boletos_filtrados)
 
 st.markdown(
     f"<div style='font-weight:600; color:#1E293B; margin:16px 0 8px'>"
-    f"{total_filtrados} pagamento(s) em {mes_selecionado}</div>",
+    f"{total_filtrados} registro(s) em {mes_selecionado}</div>",
     unsafe_allow_html=True,
 )
 
@@ -82,11 +82,13 @@ if boletos_filtrados:
     df["Valor"] = df["valor"].apply(format_currency)
     df["Vencimento"] = df["vencimento"].apply(format_date_br)
     df["Categoria"] = df["categoria"].fillna("—")
+    df["Tipo"] = df["tipo"].map({"pagamento": "💸 Pagamento", "receita": "💰 Receita"}).fillna("💸 Pagamento")
 
     st.dataframe(
-        df[["descricao", "Valor", "Vencimento", "Categoria", "Status"]],
+        df[["descricao", "Tipo", "Valor", "Vencimento", "Categoria", "Status"]],
         column_config={
             "descricao": st.column_config.TextColumn("Descrição"),
+            "Tipo": st.column_config.TextColumn("Tipo"),
             "Valor": st.column_config.TextColumn("Valor"),
             "Vencimento": st.column_config.TextColumn("Vencimento"),
             "Categoria": st.column_config.TextColumn("Categoria"),
@@ -105,34 +107,49 @@ st.markdown(
 
 # Resumo por categoria — filtrado em memória (sem query extra)
 totais: dict = {}
+totais_rec: dict = {}
 for b in todos_boletos:
-    if b["competencia"].startswith(ano_resumo):
-        cat = b.get("categoria") or "Sem categoria"
+    if not b["competencia"].startswith(ano_resumo):
+        continue
+    cat = b.get("categoria") or "Sem categoria"
+    if b.get("tipo", "pagamento") == "receita":
+        totais_rec[cat] = totais_rec.get(cat, 0) + b["valor"]
+    else:
         totais[cat] = totais.get(cat, 0) + b["valor"]
 
-if not totais:
-    st.info("Nenhum pagamento registrado para este ano.")
+if not totais and not totais_rec:
+    st.info("Nenhum registro para este ano.")
 else:
-    df_cat = pd.DataFrame(
-        sorted(totais.items(), key=lambda x: -x[1]),
-        columns=["Categoria", "Total"],
-    )
-    df_cat["Total (R$)"] = df_cat["Total"].apply(format_currency)
+    tab_pag, tab_rec = st.tabs(["💸 Pagamentos", "💰 Receitas"])
 
-    col_tbl, col_chart = st.columns([1, 2])
-    with col_tbl:
-        st.dataframe(
-            df_cat[["Categoria", "Total (R$)"]],
-            use_container_width=True,
-            hide_index=True,
-        )
-    with col_chart:
-        st.markdown(
-            "<div style='font-size:12px; color:#94A3B8; margin-bottom:4px'>Valores em R$</div>",
-            unsafe_allow_html=True,
-        )
-        st.bar_chart(
-            df_cat.set_index("Categoria")["Total"],
-            use_container_width=True,
-            y_label="R$",
-        )
+    with tab_pag:
+        if not totais:
+            st.info("Nenhum pagamento registrado para este ano.")
+        else:
+            df_cat = pd.DataFrame(
+                sorted(totais.items(), key=lambda x: -x[1]),
+                columns=["Categoria", "Total"],
+            )
+            df_cat["Total (R$)"] = df_cat["Total"].apply(format_currency)
+            col_tbl, col_chart = st.columns([1, 2])
+            with col_tbl:
+                st.dataframe(df_cat[["Categoria", "Total (R$)"]], use_container_width=True, hide_index=True)
+            with col_chart:
+                st.markdown("<div style='font-size:12px; color:#94A3B8; margin-bottom:4px'>Valores em R$</div>", unsafe_allow_html=True)
+                st.bar_chart(df_cat.set_index("Categoria")["Total"], use_container_width=True, y_label="R$")
+
+    with tab_rec:
+        if not totais_rec:
+            st.info("Nenhuma receita registrada para este ano.")
+        else:
+            df_rec = pd.DataFrame(
+                sorted(totais_rec.items(), key=lambda x: -x[1]),
+                columns=["Categoria", "Total"],
+            )
+            df_rec["Total (R$)"] = df_rec["Total"].apply(format_currency)
+            col_tbl2, col_chart2 = st.columns([1, 2])
+            with col_tbl2:
+                st.dataframe(df_rec[["Categoria", "Total (R$)"]], use_container_width=True, hide_index=True)
+            with col_chart2:
+                st.markdown("<div style='font-size:12px; color:#94A3B8; margin-bottom:4px'>Valores em R$</div>", unsafe_allow_html=True)
+                st.bar_chart(df_rec.set_index("Categoria")["Total"], use_container_width=True, y_label="R$", color="#059669")

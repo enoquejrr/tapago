@@ -18,9 +18,20 @@ storage = StorageService(usuario=username, access_token=st.session_state.get("ac
 boleto_svc = BoletoService(storage)
 
 # ── Cabeçalho ──────────────────────────────────────────────────────────────
-st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>➕ Novo Pagamento</h2>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B; margin-top:0'>Registre uma conta ou pagamento para o mês.</p>", unsafe_allow_html=True)
+st.markdown("<h2 style='color:#1E293B; margin-bottom:4px'>➕ Novo Pagamento / Receita</h2>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748B; margin-top:0'>Registre um pagamento ou uma receita para o mês.</p>", unsafe_allow_html=True)
 st.divider()
+
+# ── Tipo (pagamento / receita) ──────────────────────────────────────────────
+tipo_opcoes = {"💸 Pagamento": "pagamento", "💰 Receita": "receita"}
+tipo_label = st.radio(
+    "Tipo",
+    list(tipo_opcoes.keys()),
+    horizontal=True,
+    help="Pagamento = saída de dinheiro. Receita = entrada de dinheiro.",
+)
+tipo = tipo_opcoes[tipo_label]
+st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
 
 # ── Categoria (fora do form para reagir ao selectbox sem precisar submeter) ─
 categorias_salvas = storage.get_categorias()
@@ -87,7 +98,8 @@ with st.form("form_novo_boleto", clear_on_submit=True):
         help="Dia em que o pagamento vence.",
     )
 
-    submitted = st.form_submit_button("💾 Salvar pagamento", use_container_width=True, type="primary")
+    label_btn = "💾 Salvar receita" if tipo == "receita" else "💾 Salvar pagamento"
+    submitted = st.form_submit_button(label_btn, use_container_width=True, type="primary")
 
     if submitted:
         if vencimento is None:
@@ -98,8 +110,9 @@ with st.form("form_novo_boleto", clear_on_submit=True):
             st.error("O valor deve ser maior que zero.")
         else:
             try:
+                tipo_label_lower = "receita" if tipo == "receita" else "pagamento"
                 if boleto_svc.verificar_duplicata(descricao.strip(), vencimento.strftime("%Y-%m-%d")):
-                    st.warning(f"⚠️ Já existe um pagamento **{descricao.strip()}** com vencimento em {vencimento.strftime('%d/%m/%Y')}. O pagamento foi salvo mesmo assim.")
+                    st.warning(f"⚠️ Já existe um {tipo_label_lower} **{descricao.strip()}** com vencimento em {vencimento.strftime('%d/%m/%Y')}. O registro foi salvo mesmo assim.")
 
                 categoria_final = None
                 if cat_escolhida == "+ Nova categoria..." and nova_cat and nova_cat.strip():
@@ -111,7 +124,7 @@ with st.form("form_novo_boleto", clear_on_submit=True):
                     categoria_final = cat_escolhida
 
                 competencia = vencimento.strftime("%Y-%m")
-                label_spinner = "Salvando pagamento..." if repetir == 1 else f"Criando {int(repetir)} pagamentos..."
+                label_spinner = f"Salvando {tipo_label_lower}..." if repetir == 1 else f"Criando {int(repetir)} {tipo_label_lower}s..."
                 with st.spinner(label_spinner):
                     boleto_svc.criar_recorrente(
                         descricao=descricao.strip(),
@@ -120,11 +133,13 @@ with st.form("form_novo_boleto", clear_on_submit=True):
                         competencia=competencia,
                         categoria=categoria_final,
                         meses=int(repetir),
+                        tipo=tipo,
                     )
 
+                genero = "registrada" if tipo == "receita" else "registrado"
                 if repetir == 1:
-                    st.toast(f"Pagamento '{descricao.strip()}' registrado para {competencia}.", icon="✅")
+                    st.toast(f"{tipo_label_lower.capitalize()} '{descricao.strip()}' {genero} para {competencia}.", icon="✅")
                 else:
-                    st.toast(f"{int(repetir)} pagamentos de '{descricao.strip()}' criados a partir de {competencia}.", icon="✅")
+                    st.toast(f"{int(repetir)} {tipo_label_lower}s de '{descricao.strip()}' criados a partir de {competencia}.", icon="✅")
             except RuntimeError as e:
                 st.error(str(e))

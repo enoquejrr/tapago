@@ -48,6 +48,7 @@ class StorageService:
             "vencimento": str(r["vencimento"]),
             "competencia": r["competencia"],
             "categoria": r.get("categoria"),
+            "tipo": r.get("tipo", "pagamento"),
             "pago": r["pago"],
             "criado_em": r.get("criado_em", ""),
         }
@@ -112,7 +113,7 @@ class StorageService:
 
     # ── Escrita ────────────────────────────────────────────────────────────────
 
-    def create(self, descricao: str, valor: float, vencimento: str, competencia: str, categoria: str = None) -> Boleto:
+    def create(self, descricao: str, valor: float, vencimento: str, competencia: str, categoria: str = None, tipo: str = "pagamento") -> Boleto:
         """Cria novo boleto para o usuário logado."""
         try:
             row = {
@@ -121,6 +122,7 @@ class StorageService:
                 "vencimento": vencimento,
                 "competencia": competencia,
                 "categoria": categoria,
+                "tipo": tipo,
                 "pago": False,
                 "usuario": self.usuario,
             }

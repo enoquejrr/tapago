@@ -26,6 +26,7 @@ class BoletoService:
         competencia: str,
         categoria: Optional[str] = None,
         meses: int = 1,
+        tipo: str = "pagamento",
     ) -> List[Boleto]:
         """Cria N boletos mensais corrigindo dias inválidos (ex: 31 de fevereiro).
 
@@ -44,7 +45,7 @@ class BoletoService:
             nova_vencimento = nova_data.strftime("%Y-%m-%d")
             nova_competencia = nova_data.strftime("%Y-%m")
             criados.append(
-                self.storage.create(descricao, valor, nova_vencimento, nova_competencia, categoria)
+                self.storage.create(descricao, valor, nova_vencimento, nova_competencia, categoria, tipo)
             )
 
         return criados

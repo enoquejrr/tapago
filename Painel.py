@@ -85,32 +85,40 @@ if boletos:
         if cat_filtro != "Todas":
             boletos = [b for b in boletos if b.get("categoria") == cat_filtro]
 
-total_mes = sum(b["valor"] for b in boletos)
-total_pago = sum(b["valor"] for b in boletos if b["pago"])
+pagamentos = [b for b in boletos if b.get("tipo", "pagamento") == "pagamento"]
+receitas   = [b for b in boletos if b.get("tipo", "pagamento") == "receita"]
+
+total_mes      = sum(b["valor"] for b in pagamentos)
+total_pago     = sum(b["valor"] for b in pagamentos if b["pago"])
 total_pendente = total_mes - total_pago
-pct_pago = int(total_pago / total_mes * 100) if total_mes > 0 else 0
+pct_pago       = int(total_pago / total_mes * 100) if total_mes > 0 else 0
+total_receitas = sum(b["valor"] for b in receitas)
+saldo          = total_receitas - total_mes
 
 # ── Cards de resumo ─────────────────────────────────────────────────────────
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.metric("💰 Total do mês", format_currency(total_mes))
+    st.metric("💸 Pagamentos", format_currency(total_mes))
 with c2:
     st.metric("✅ Pago", format_currency(total_pago))
 with c3:
-    st.metric("⏳ Pendente", format_currency(total_pendente))
+    st.metric("💰 Receitas", format_currency(total_receitas))
+with c4:
+    st.metric("📊 Saldo", format_currency(saldo))
 
 st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
-st.progress(pct_pago / 100, text=f"{pct_pago}% pago neste mês")
+if total_mes > 0:
+    st.progress(pct_pago / 100, text=f"{pct_pago}% dos pagamentos quitados neste mês")
 st.divider()
 
 # ── Lista de boletos ─────────────────────────────────────────────────────────
 if not boletos:
-    st.info("Nenhum pagamento cadastrado para este mês. Use **Novo Pagamento** na barra lateral para adicionar.")
+    st.info("Nenhum pagamento ou receita cadastrado para este mês. Use **Novo Pagamento / Receita** na barra lateral para adicionar.")
 else:
-    vencidos = [b for b in boletos if not b["pago"] and is_overdue(b["vencimento"])]
-    proximos = [b for b in boletos if not b["pago"] and is_due_soon(b["vencimento"])]
-    normais  = [b for b in boletos if not b["pago"] and not is_overdue(b["vencimento"]) and not is_due_soon(b["vencimento"])]
-    pagos    = [b for b in boletos if b["pago"]]
+    vencidos = [b for b in pagamentos if not b["pago"] and is_overdue(b["vencimento"])]
+    proximos = [b for b in pagamentos if not b["pago"] and is_due_soon(b["vencimento"])]
+    normais  = [b for b in pagamentos if not b["pago"] and not is_overdue(b["vencimento"]) and not is_due_soon(b["vencimento"])]
+    pagos    = [b for b in pagamentos if b["pago"]]
 
     def card(b: dict, border_color: str, status_text: str, btn_key: str, undo: bool = False) -> None:
         cat = b.get("categoria") or ""
@@ -188,6 +196,38 @@ else:
         with st.expander(f"✅ Pagos ({len(pagos)})", expanded=False):
             for b in pagos:
                 card(b, "#94A3B8", f"Vencimento: {format_date_br(b['vencimento'])}", f"pg_{b['id']}", undo=True)
+
+    if receitas:
+        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='color:#059669; font-weight:700; font-size:13px; "
+            "text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px'>💰 Receitas</div>",
+            unsafe_allow_html=True,
+        )
+        for b in receitas:
+            cat = b.get("categoria") or ""
+            descricao_safe = _html.escape(b["descricao"])
+            cat_safe = _html.escape(cat)
+            cat_html = (
+                f'<span style="background:#ECFDF5; color:#059669; padding:1px 8px; '
+                f'border-radius:999px; font-size:11px; margin-left:8px">{cat_safe}</span>'
+                if cat_safe else ""
+            )
+            st.markdown(
+                f"""<div style="border-left:4px solid #059669; padding:10px 16px;
+                    background:white; border-radius:0 10px 10px 0; margin-bottom:4px;
+                    box-shadow:0 1px 2px rgba(0,0,0,0.05)">
+                    <div style="display:flex; justify-content:space-between; align-items:center">
+                        <div>
+                            <strong style="font-size:15px; color:#1E293B">{descricao_safe}</strong>
+                            {cat_html}
+                        </div>
+                        <strong style="color:#059669; font-size:15px">+{format_currency(b['valor'])}</strong>
+                    </div>
+                    <div style="color:#94A3B8; font-size:12px; margin-top:5px">{format_date_br(b['vencimento'])}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
 
 # ── Rodapé ───────────────────────────────────────────────────────────────────
 st.divider()

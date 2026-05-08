@@ -11,6 +11,7 @@ class Boleto(TypedDict, total=False):
     competencia: Required[str]   # YYYY-MM
     pago:        Required[bool]
     categoria:   Optional[str]
+    tipo:        str   # 'pagamento' | 'receita'
     criado_em:   str
 
 
